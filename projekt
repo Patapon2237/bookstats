@@ -1,1 +1,214 @@
+import json
+import os
+from datetime import datetime
+
+PLIK = "studenci.json"
+
+
+# -------------------- PESEL --------------------
+
+def waliduj_pesel(pesel, plec):
+    if len(pesel) != 11 or not pesel.isdigit():
+        return False, "PESEL musi składać się z 11 cyfr."
+
+    wagi = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3]
+    suma = sum(int(pesel[i]) * wagi[i] for i in range(10))
+    kontrolna = (10 - (suma % 10)) % 10
+
+    if kontrolna != int(pesel[10]):
+        return False, "Niepoprawna suma kontrolna PESEL."
+
+    # data urodzenia
+    rok = int(pesel[0:2])
+    miesiac = int(pesel[2:4])
+    dzien = int(pesel[4:6])
+
+    if 1 <= miesiac <= 12:
+        rok += 1900
+    elif 21 <= miesiac <= 32:
+        rok += 2000
+        miesiac -= 20
+    else:
+        return False, "Niepoprawny miesiąc w PESEL."
+
+    try:
+        datetime(rok, miesiac, dzien)
+    except ValueError:
+        return False, "Niepoprawna data urodzenia w PESEL."
+
+    # płeć
+    cyfra_plci = int(pesel[9])
+    if (cyfra_plci % 2 == 0 and plec.lower() != "k") or \
+       (cyfra_plci % 2 == 1 and plec.lower() != "m"):
+        return False, "Płeć niezgodna z numerem PESEL."
+
+    return True, "PESEL poprawny."
+
+
+# -------------------- PLIK --------------------
+
+def wczytaj_dane():
+    if not os.path.exists(PLIK):
+        return []
+    try:
+        with open(PLIK, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def zapisz_dane(studenci):
+    try:
+        with open(PLIK, "w", encoding="utf-8") as f:
+            json.dump(studenci, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print("Błąd zapisu:", e)
+
+
+# -------------------- OPERACJE --------------------
+
+def dodaj_studenta(studenci):
+    imie = input("Imię: ")
+    nazwisko = input("Nazwisko: ")
+    adres = input("Adres: ")
+    indeks = input("Numer indeksu: ")
+    pesel = input("PESEL: ")
+    plec = input("Płeć (M/K): ")
+
+    ok, komunikat = waliduj_pesel(pesel, plec)
+    if not ok:
+        print("BŁĄD:", komunikat)
+        return
+
+    student = {
+        "imie": imie,
+        "nazwisko": nazwisko,
+        "adres": adres,
+        "indeks": indeks,
+        "pesel": pesel,
+        "plec": plec.upper()
+    }
+
+    studenci.append(student)
+    zapisz_dane(studenci)
+    print("Student dodany poprawnie.")
+
+
+def wyswietl_studentow(studenci):
+    if not studenci:
+        print("Brak studentów.")
+        return
+
+    for s in studenci:
+        print("-" * 40)
+        for k, v in s.items():
+            print(f"{k.capitalize()}: {v}")
+
+
+def wyszukaj_nazwisko(studenci):
+    nazwisko = input("Podaj nazwisko: ").lower()
+    wyniki = [s for s in studenci if s["nazwisko"].lower() == nazwisko]
+    wyswietl_studentow(wyniki)
+
+
+def wyszukaj_pesel(studenci):
+    pesel = input("Podaj PESEL: ")
+    for s in studenci:
+        if s["pesel"] == pesel:
+            wyswietl_studentow([s])
+            return
+    print("Nie znaleziono studenta.")
+
+
+def sortuj_nazwisko(studenci):
+    studenci.sort(key=lambda x: x["nazwisko"].lower())
+    zapisz_dane(studenci)
+    print("Posortowano według nazwiska.")
+
+
+def sortuj_pesel(studenci):
+    studenci.sort(key=lambda x: x["pesel"])
+    zapisz_dane(studenci)
+    print("Posortowano według PESEL.")
+
+
+def usun_studenta(studenci):
+    indeks = input("Podaj numer indeksu: ")
+    for s in studenci:
+        if s["indeks"] == indeks:
+            studenci.remove(s)
+            zapisz_dane(studenci)
+            print("Student usunięty.")
+            return
+    print("Nie znaleziono studenta.")
+
+
+def aktualizuj_studenta(studenci):
+    indeks = input("Podaj numer indeksu studenta: ")
+
+    for s in studenci:
+        if s["indeks"] == indeks:
+            print("Pozostaw puste aby nie zmieniać")
+
+            imie = input(f"Imię ({s['imie']}): ") or s["imie"]
+            nazwisko = input(f"Nazwisko ({s['nazwisko']}): ") or s["nazwisko"]
+            adres = input(f"Adres ({s['adres']}): ") or s["adres"]
+
+            s["imie"] = imie
+            s["nazwisko"] = nazwisko
+            s["adres"] = adres
+
+            zapisz_dane(studenci)
+            print("Dane zaktualizowane.")
+            return
+
+    print("Nie znaleziono studenta.")
+
+
+# -------------------- MENU --------------------
+
+def menu():
+    studenci = wczytaj_dane()
+
+    while True:
+        print("""
+======== BAZA STUDENTÓW ========
+1. Dodaj studenta
+2. Wyświetl wszystkich
+3. Wyszukaj po nazwisku
+4. Wyszukaj po PESEL
+5. Sortuj po nazwisku
+6. Sortuj po PESEL
+7. Usuń studenta
+8. Aktualizuj dane
+0. Wyjście
+""")
+
+        wybor = input("Wybierz opcję: ")
+
+        if wybor == "1":
+            dodaj_studenta(studenci)
+        elif wybor == "2":
+            wyswietl_studentow(studenci)
+        elif wybor == "3":
+            wyszukaj_nazwisko(studenci)
+        elif wybor == "4":
+            wyszukaj_pesel(studenci)
+        elif wybor == "5":
+            sortuj_nazwisko(studenci)
+        elif wybor == "6":
+            sortuj_pesel(studenci)
+        elif wybor == "7":
+            usun_studenta(studenci)
+        elif wybor == "8":
+            aktualizuj_studenta(studenci)
+        elif wybor == "0":
+            print("Zamykanie programu.")
+            break
+        else:
+            print("Nieprawidłowa opcja.")
+
+
+if __name__ == "__main__":
+    menu()
 
